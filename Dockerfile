@@ -81,6 +81,32 @@ COPY --chown=gitpod:gitpod nginx /etc/nginx/
 ENV APACHE_DOCROOT_IN_REPO="public"
 ENV NGINX_DOCROOT_IN_REPO="public"
 
+### Install Phalcon ###
+USER root
+ENV DEBIAN_FRONTEND noninteractive
+
+# Official method not working
+#RUN curl -s "https://packagecloud.io/install/repositories/phalcon/stable/script.deb.sh" | bash
+
+RUN add-apt-repository ppa:ondrej/php && \
+    add-apt-repository ppa:ondrej/apache2 && \
+    curl -L https://packagecloud.io/phalcon/stable/gpgkey | sudo apt-key add - && \
+    #`lsb_release -cs` -> bionic / `lsb_release -is` -> Ubuntu
+    sh -c 'echo "deb https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
+    sh -c 'echo "deb-src https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
+#    echo "deb https://packagecloud.io/phalcon/stable/ubuntu/ disco main" > /etc/apt/sources.list.d/phalcon_stable.list && \
+#    echo "deb-src https://packagecloud.io/phalcon/stable/ubuntu/ disco main" >> /etc/apt/sources.list.d/phalcon_stable.list && \
+    apt-get update && apt-get install -y apt-utils gcc libpcre3-dev software-properties-common curl gnupg apt-transport-https && \
+#   apt-get dist-upgrade -y && apt-get autoremove -y && apt-get clean && \
+    apt-get update && \
+    apt-get install -y php php-curl php-gd php-json php-mbstring && \
+#    apt-cache search phalcon* && \
+#    apt-cache search php-ph* && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y php-phalcon4 && \
+    apt-get autoremove -y && apt-get autoclean
+#   && rm -rf /var/lib/apt/lists/*
+
 ### PostgreSQL ###
 LABEL dazzle/layer=postgresql
 RUN sudo apt-get update \
