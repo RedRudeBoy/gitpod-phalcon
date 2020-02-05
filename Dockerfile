@@ -39,10 +39,10 @@ USER gitpod
 # use sudo so that user does not get sudo usage info on (the first) login
 RUN sudo echo "Running 'sudo' for Gitpod: success"
 # create .bashrc.d folder and source it in the bashrc
-RUN mkdir /home/gitpod/.bashrc.d && \
-    (echo; echo "for i in \$(ls \$HOME/.bashrc.d/*); do source \$i; done"; echo) >> /home/gitpod/.bashrc
+#RUN mkdir /home/gitpod/.bashrc.d && \
+#    (echo; echo "for i in \$(ls \$HOME/.bashrc.d/*); do source \$i; done"; echo) >> /home/gitpod/.bashrc
     
-    ### Apache, PHP and Nginx ###
+### Apache, PHP and Nginx ###
 LABEL dazzle/layer=tool-nginx
 LABEL dazzle/test=tests/lang-php.yaml
 USER root
@@ -80,6 +80,46 @@ COPY --chown=gitpod:gitpod nginx /etc/nginx/
 ## The directory relative to your git repository that will be served by Apache / Nginx
 ENV APACHE_DOCROOT_IN_REPO="public"
 ENV NGINX_DOCROOT_IN_REPO="public"
+
+### PostgreSQL ###
+LABEL dazzle/layer=postgresql
+RUN sudo apt-get update \
+ && sudo apt-get install -y postgresql postgresql-contrib postgresql-client-common \
+ && sudo apt-get clean
+#&& sudo rm -rf /var/cache/apt/* /var/lib/apt/lists/* /tmp/*
+
+## Setup PostgreSQL server for user gitpod
+ENV PG_VERSION=10
+ENV PATH="$PATH:/usr/lib/postgresql/$PG_VERSION/bin"
+ENV PGDATA="/home/gitpod/.pg_ctl/data"
+RUN mkdir -p ~/.pg_ctl/bin ~/.pg_ctl/data ~/.pg_ctl/sockets \
+ && initdb -D ~/.pg_ctl/data/ \
+ && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" start\n" > ~/.pg_ctl/bin/pg_start \
+ && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" stop\n" > ~/.pg_ctl/bin/pg_stop \
+ && chmod +x ~/.pg_ctl/bin/*
+ENV PATH="$PATH:$HOME/.pg_ctl/bin"
+ENV DATABASE_URL="postgresql://gitpod@localhost"
+ENV PGHOSTADDR="127.0.0.1"
+ENV PGDATABASE="postgres"
+
+# This is a bit of a hack. At the moment we have no means of starting background
+# tasks from a Dockerfile. This workaround checks, on each bashrc eval, if the
+# PostgreSQL server is running, and if not starts it.
+RUN printf "\n# Auto-start PostgreSQL server.\n[[ \$(pg_ctl status | grep PID) ]] || pg_start > /dev/null\n" >> ~/.bashrc
+
+### OpenAPI ###
+#LABEL dazzle/layer=openapi
+#ARG OPENAPI_GENERATOR_VERSION=3.3.4
+#ARG OPENAPI_PATH=/home/gitpod/bin/openapitools
+#USER gitpod
+#RUN mkdir -p "$OPENAPI_PATH" && \
+#    curl https://raw.githubusercontent.com/OpenAPITools/openapi-generator/master/bin/utils/openapi-generator-cli.sh > "$OPENAPI_PATH/openapi-generator-cli" && \
+#    chmod u+x "$OPENAPI_PATH/openapi-generator-cli" && \
+#    # Make runnable for gitpod user
+#    echo "export PATH=$PATH:$OPENAPI_PATH/" >> /home/gitpod/.bashrc && \
+#    echo "export OPENAPI_GENERATOR_VERSION=$OPENAPI_GENERATOR_VERSION" >> /home/gitpod/.bashrc
+# Downloads maven deps as side effect
+#RUN $OPENAPI_PATH/openapi-generator-cli version
 
 ### Prologue (built across all layers) ###
 LABEL dazzle/layer=dazzle-prologue
