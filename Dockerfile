@@ -109,6 +109,7 @@ RUN add-apt-repository ppa:ondrej/php && \
 
 ### PostgreSQL ###
 LABEL dazzle/layer=postgresql
+USER gitpod
 RUN sudo apt-get update \
  && sudo apt-get install -y postgresql postgresql-contrib postgresql-client-common \
  && sudo apt-get clean
