@@ -78,8 +78,8 @@ COPY --chown=gitpod:gitpod apache2/ /etc/apache2/
 COPY --chown=gitpod:gitpod nginx /etc/nginx/
 
 ## The directory relative to your git repository that will be served by Apache / Nginx
-ENV APACHE_DOCROOT_IN_REPO="public"
-ENV NGINX_DOCROOT_IN_REPO="public"
+ENV APACHE_DOCROOT_IN_REPO="./api/public"
+ENV NGINX_DOCROOT_IN_REPO="./api/public"
 
 ### Install Phalcon ###
 USER root
@@ -107,32 +107,51 @@ RUN add-apt-repository ppa:ondrej/php && \
     apt-get autoremove -y && apt-get autoclean
 #   && rm -rf /var/lib/apt/lists/*
 
-### PostgreSQL ###
-LABEL dazzle/layer=postgresql
+### MySQL ###
+LABEL dazzle/layer=mysql
 USER gitpod
 RUN sudo apt-get update \
- && sudo apt-get install -y postgresql postgresql-contrib postgresql-client-common \
- && sudo apt-get clean
+ && sudo apt-get install -y mysql-server \
+ && sudo apt-get clean && rm -rf /var/cache/apt/* /var/lib/apt/lists/* /tmp/* \
+ && sudo mkdir /var/run/mysqld \
+ && sudo chown -R gitpod:gitpod /etc/mysql /var/run/mysqld /var/log/mysql /var/lib/mysql /var/lib/mysql-files /var/lib/mysql-keyring /var/lib/mysql-upgrade
+
+USER root
+# Install our own MySQL config
+COPY ./mysql/mysql.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
+# Install default-login for MySQL clients
+COPY ./mysql/client.cnf /etc/mysql/mysql.conf.d/client.cnf
+COPY ./mysql/mysql-bashrc-launch.sh /etc/mysql/mysql-bashrc-launch.sh
+
+USER gitpod
+RUN echo "/etc/mysql/mysql-bashrc-launch.sh" >> ~/.bashrc
+
+### PostgreSQL ###
+#LABEL dazzle/layer=postgresql
+#USER gitpod
+#RUN sudo apt-get update \
+# && sudo apt-get install -y postgresql postgresql-contrib postgresql-client-common \
+# && sudo apt-get clean
 #&& sudo rm -rf /var/cache/apt/* /var/lib/apt/lists/* /tmp/*
 
 ## Setup PostgreSQL server for user gitpod
-ENV PG_VERSION=10
-ENV PATH="$PATH:/usr/lib/postgresql/$PG_VERSION/bin"
-ENV PGDATA="/home/gitpod/.pg_ctl/data"
-RUN mkdir -p ~/.pg_ctl/bin ~/.pg_ctl/data ~/.pg_ctl/sockets \
- && initdb -D ~/.pg_ctl/data/ \
- && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" start\n" > ~/.pg_ctl/bin/pg_start \
- && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" stop\n" > ~/.pg_ctl/bin/pg_stop \
- && chmod +x ~/.pg_ctl/bin/*
-ENV PATH="$PATH:$HOME/.pg_ctl/bin"
-ENV DATABASE_URL="postgresql://gitpod@localhost"
-ENV PGHOSTADDR="127.0.0.1"
-ENV PGDATABASE="postgres"
+#ENV PG_VERSION=10
+#ENV PATH="$PATH:/usr/lib/postgresql/$PG_VERSION/bin"
+#ENV PGDATA="/home/gitpod/.pg_ctl/data"
+#RUN mkdir -p ~/.pg_ctl/bin ~/.pg_ctl/data ~/.pg_ctl/sockets \
+# && initdb -D ~/.pg_ctl/data/ \
+# && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" start\n" > ~/.pg_ctl/bin/pg_start \
+# && printf "#!/bin/bash\npg_ctl -D ~/.pg_ctl/data/ -l ~/.pg_ctl/log -o \"-k ~/.pg_ctl/sockets\" stop\n" > ~/.pg_ctl/bin/pg_stop \
+# && chmod +x ~/.pg_ctl/bin/*
+#ENV PATH="$PATH:$HOME/.pg_ctl/bin"
+#ENV DATABASE_URL="postgresql://gitpod@localhost"
+#ENV PGHOSTADDR="127.0.0.1"
+#ENV PGDATABASE="postgres"
 
 # This is a bit of a hack. At the moment we have no means of starting background
 # tasks from a Dockerfile. This workaround checks, on each bashrc eval, if the
 # PostgreSQL server is running, and if not starts it.
-RUN printf "\n# Auto-start PostgreSQL server.\n[[ \$(pg_ctl status | grep PID) ]] || pg_start > /dev/null\n" >> ~/.bashrc
+#RUN printf "\n# Auto-start PostgreSQL server.\n[[ \$(pg_ctl status | grep PID) ]] || pg_start > /dev/null\n" >> ~/.bashrc
 
 ### OpenAPI ###
 #LABEL dazzle/layer=openapi
