@@ -80,11 +80,13 @@ COPY --chown=gitpod:gitpod nginx /etc/nginx/
 ## The directory relative to your git repository that will be served by Apache / Nginx
 ENV APACHE_DOCROOT_IN_REPO="./api/public"
 ENV NGINX_DOCROOT_IN_REPO="./api/public"
+USER gitpod
 RUN echo 'export APACHE_DOCROOT_IN_REPO="./api/public"'  >> ~/.bashrc
 RUN echo 'export NGINX_DOCROOT_IN_REPO="./api/public"'  >> ~/.bashrc
 RUN echo 'export GITPOD_REPO_ROOT="/workspace/discoveryfy"'  >> ~/.bashrc
 
 ### Install Phalcon ###
+LABEL dazzle/layer=phalcon
 USER root
 ENV DEBIAN_FRONTEND noninteractive
 

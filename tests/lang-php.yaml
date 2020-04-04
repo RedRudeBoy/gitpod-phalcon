@@ -21,6 +21,7 @@
   - stdout.indexOf("mbstring\n") != -1
   - stdout.indexOf("mysql\n") != -1
   - stdout.indexOf("ftp\n") != -1
+  - stdout.indexOf("phalcon\n") != -1
   - stdout.indexOf("pgsql\n") != -1
   - stdout.indexOf("sqlite3\n") != -1
   - stdout.indexOf("tokenizer\n") != -1
