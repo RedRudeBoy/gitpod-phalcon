@@ -1,10 +1,14 @@
 # Using bionic instead of disco
-FROM buildpack-deps:bionic
+# FROM buildpack-deps:bionic
+# Now the default full gitpod.io image is using focal
+# https://github.com/gitpod-io/workspace-images/tree/master/full
+FROM buildpack-deps:focal
 
 ### base ###
 RUN yes | unminimize \
     && apt-get install -yq \
-        asciidoctor \
+        zip \
+        unzip \
         bash-completion \
         build-essential \
         htop \
@@ -15,14 +19,21 @@ RUN yes | unminimize \
         nano \
         software-properties-common \
         sudo \
+        time \
         vim \
         multitail \
         lsof \
+        asciidoctor \
     && locale-gen en_US.UTF-8 \
     && mkdir /var/lib/apt/dazzle-marks \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*
 
 ENV LANG=en_US.UTF-8
+
+### Git ###
+RUN add-apt-repository -y ppa:git-core/ppa \
+    && apt-get install -yq git \
+    && rm -rf /var/lib/apt/lists/*
 
 ### Gitpod user ###
 # '-l': see https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#user
@@ -37,10 +48,10 @@ RUN { echo && echo "PS1='\[\e]0;\u \w\a\]\[\033[01;32m\]\u\[\033[00m\] \[\033[01
 ### Gitpod user (2) ###
 USER gitpod
 # use sudo so that user does not get sudo usage info on (the first) login
-RUN sudo echo "Running 'sudo' for Gitpod: success"
-# create .bashrc.d folder and source it in the bashrc
-#RUN mkdir /home/gitpod/.bashrc.d && \
-#    (echo; echo "for i in \$(ls \$HOME/.bashrc.d/*); do source \$i; done"; echo) >> /home/gitpod/.bashrc
+RUN sudo echo "Running 'sudo' for Gitpod: success" && \
+    # create .bashrc.d folder and source it in the bashrc
+    mkdir /home/gitpod/.bashrc.d && \
+    (echo; echo "for i in \$(ls \$HOME/.bashrc.d/*); do source \$i; done"; echo) >> /home/gitpod/.bashrc
     
 ### Apache, PHP and Nginx ###
 LABEL dazzle/layer=tool-nginx
@@ -53,11 +64,11 @@ RUN  apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -yq \
         composer \
         php \
         php-all-dev \
+        php-bcmath \
         php-ctype \
         php-curl \
         php-date \
         php-gd \
-        php-gettext \
         php-intl \
         php-json \
         php-mbstring \
@@ -93,18 +104,18 @@ ENV DEBIAN_FRONTEND noninteractive
 # Official method not working
 #RUN curl -s "https://packagecloud.io/install/repositories/phalcon/stable/script.deb.sh" | bash
 
-RUN add-apt-repository ppa:ondrej/php && \
+RUN apt-get update && apt-get install -y apt-utils gcc libpcre3-dev software-properties-common curl gnupg apt-transport-https && \
+    add-apt-repository ppa:ondrej/php && \
     add-apt-repository ppa:ondrej/apache2 && \
-    curl -L https://packagecloud.io/phalcon/stable/gpgkey | sudo apt-key add - && \
-    #`lsb_release -cs` -> bionic / `lsb_release -is` -> Ubuntu
-    sh -c 'echo "deb https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
-    sh -c 'echo "deb-src https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
+#    curl -L https://packagecloud.io/phalcon/stable/gpgkey | sudo apt-key add - && \
+#    # `lsb_release -cs` -> bionic / `lsb_release -is` -> Ubuntu
+#    sh -c 'echo "deb https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
+#    sh -c 'echo "deb-src https://packagecloud.io/phalcon/stable/ubuntu/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/phalcon_stable.list' && \
 #    echo "deb https://packagecloud.io/phalcon/stable/ubuntu/ disco main" > /etc/apt/sources.list.d/phalcon_stable.list && \
 #    echo "deb-src https://packagecloud.io/phalcon/stable/ubuntu/ disco main" >> /etc/apt/sources.list.d/phalcon_stable.list && \
-    apt-get update && apt-get install -y apt-utils gcc libpcre3-dev software-properties-common curl gnupg apt-transport-https && \
 #   apt-get dist-upgrade -y && apt-get autoremove -y && apt-get clean && \
     apt-get update && \
-    apt-get install -y php php-curl php-gd php-json php-mbstring && \
+    apt-get install -y php php-curl php-gettext php-gd php-json php-mbstring && \
 #    apt-cache search phalcon* && \
 #    apt-cache search php-ph* && \
     apt-get dist-upgrade -y && \
@@ -112,7 +123,23 @@ RUN add-apt-repository ppa:ondrej/php && \
     apt-get autoremove -y && apt-get autoclean
 #   && rm -rf /var/lib/apt/lists/*
 
+### Node.js ###
+LABEL dazzle/layer=lang-node
+LABEL dazzle/test=tests/lang-node.yaml
+USER gitpod
+ENV NODE_VERSION=12.16.3
+RUN curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | PROFILE=/dev/null bash \
+    && bash -c ". .nvm/nvm.sh \
+        && nvm install $NODE_VERSION \
+        && nvm alias default $NODE_VERSION \
+        && npm install -g npm typescript yarn" \
+    && echo ". ~/.nvm/nvm-lazy.sh"  >> /home/gitpod/.bashrc.d/50-node
+# above, we are adding the lazy nvm init to .bashrc, because one is executed on interactive shells, the other for non-interactive shells (e.g. plugin-host)
+COPY --chown=gitpod:gitpod nvm-lazy.sh /home/gitpod/.nvm/nvm-lazy.sh
+ENV PATH=$PATH:/home/gitpod/.nvm/versions/node/v${NODE_VERSION}/bin
+
 ### MySQL ###
+### Taken from https://github.com/gitpod-io/workspace-images/tree/master/mysql
 LABEL dazzle/layer=mysql
 USER root
 RUN apt-get update \
@@ -173,9 +200,8 @@ RUN echo "/etc/mysql/mysql-bashrc-launch.sh" >> ~/.bashrc
 ### Prologue (built across all layers) ###
 LABEL dazzle/layer=dazzle-prologue
 LABEL dazzle/test=tests/prologue.yaml
-
 USER root
-RUN curl -o /usr/bin/dazzle-util -L https://github.com/32leaves/dazzle/releases/download/v0.0.3/dazzle-util_0.0.3_Linux_x86_64 \
+RUN curl -o /usr/bin/dazzle-util -L https://github.com/csweichel/dazzle/releases/download/v0.0.3/dazzle-util_0.0.3_Linux_x86_64 \
     && chmod +x /usr/bin/dazzle-util
 # merge dpkg status files
 RUN cp /var/lib/dpkg/status /tmp/dpkg-status \
