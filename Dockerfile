@@ -97,7 +97,7 @@ RUN echo 'export NGINX_DOCROOT_IN_REPO="./api/public"'  >> ~/.bashrc
 RUN echo 'export GITPOD_REPO_ROOT="/workspace/discoveryfy"'  >> ~/.bashrc
 
 ### Install Phalcon ###
-LABEL dazzle/layer=phalcon
+#LABEL dazzle/layer=phalcon
 USER root
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -182,6 +182,12 @@ RUN echo "/etc/mysql/mysql-bashrc-launch.sh" >> ~/.bashrc
 # tasks from a Dockerfile. This workaround checks, on each bashrc eval, if the
 # PostgreSQL server is running, and if not starts it.
 #RUN printf "\n# Auto-start PostgreSQL server.\n[[ \$(pg_ctl status | grep PID) ]] || pg_start > /dev/null\n" >> ~/.bashrc
+
+### Redis ###
+LABEL dazzle/layer=Redis
+RUN sudo apt-get update \
+    && sudo apt-get install -y redis-server \
+    && sudo rm -rf /var/lib/apt/lists/*
 
 ### OpenAPI ###
 #LABEL dazzle/layer=openapi
